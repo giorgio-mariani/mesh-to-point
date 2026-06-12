@@ -1,0 +1,24 @@
+[project]
+name = "mesh-to-point"
+version = "0.1.0"
+description = "RGB point-cloud generation from meshes."
+readme = "README.md"
+requires-python = ">=3.13"
+
+dependencies = [
+    "numpy",
+    "scipy",
+    "click",
+    "bpy",
+    "mathutils>=5.1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pre-commit",
+    "black",
+    "pytest",
+]
+
+[tool.setuptools]
+packages = ["mesh-to-point"]
