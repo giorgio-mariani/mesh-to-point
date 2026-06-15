@@ -4,7 +4,7 @@ from typing import *
 import numpy as np
 import json
 
-from qa3d.pointcloud.camera import ProjectiveCamera
+from mesh_to_point.camera import ProjectiveCamera
 
 
 @dataclass

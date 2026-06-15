@@ -21,4 +21,4 @@ dev = [
 ]
 
 [tool.setuptools]
-packages = ["mesh-to-point"]
+packages = ["mesh_to_point"]

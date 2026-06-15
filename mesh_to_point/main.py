@@ -2,7 +2,7 @@ import argparse
 
 import numpy as np
 
-from qa3d.pointcloud.utils import create_pointcloud_from_mesh
+from mesh_to_point.utils import create_pointcloud_from_mesh
 
 
 def main():

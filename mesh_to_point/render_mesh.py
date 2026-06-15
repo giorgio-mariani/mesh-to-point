@@ -1,6 +1,5 @@
 import argparse
 from dataclasses import dataclass
-import json
 import math
 import os
 from pathlib import Path
@@ -333,7 +332,7 @@ def main():
     raw_args = sys.argv[dash_index + 1 :]
     parser = argparse.ArgumentParser()
     parser.add_argument("--input-path", required=True, type=str)
-    parser.add_argument("--camera-pose-path", type=str)
+    parser.add_argument("--cameras-path", type=str)
     parser.add_argument("--output-path", required=False, type=str, default="multiviews")
 
     args = parser.parse_args(raw_args)
