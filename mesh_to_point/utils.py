@@ -73,7 +73,9 @@ def create_pointcloud_from_multiview(
         random_subsample_count=random_subsample_count,
     )
 
-    point_rgb_f = colorize_pointcloud(point_coords_f, np.concat([point_coords_1, point_rgb], axis=-1))
+    point_rgb_f = colorize_pointcloud(
+        point_coords_f, np.concat([point_coords_1, point_rgb], axis=-1)
+    )
     return np.concat([point_coords_f, point_rgb_f], axis=-1)
 
 
@@ -109,13 +111,19 @@ def subsample_pointcloud(
     # Downsample points from views
     num_og_points, _ = point_coords.shape
     if random_subsample_count is not None:
-        rand_ds_idx = np.random.choice(num_og_points, size=min(num_og_points, random_subsample_count))
+        rand_ds_idx = np.random.choice(
+            num_og_points, size=min(num_og_points, random_subsample_count)
+        )
         rand_coords = point_coords[rand_ds_idx]
-        fps_ds_idx = farthest_point_sample(pointcloud=rand_coords, num_points=num_points)
+        fps_ds_idx = farthest_point_sample(
+            pointcloud=rand_coords, num_points=num_points
+        )
         fps_coords = rand_coords[fps_ds_idx]
         fps_rgb = point_rgb[rand_ds_idx][fps_ds_idx]
     else:
-        fps_ds_idx = farthest_point_sample(pointcloud=point_coords, num_points=num_points)
+        fps_ds_idx = farthest_point_sample(
+            pointcloud=point_coords, num_points=num_points
+        )
         fps_coords = point_coords[fps_ds_idx]
         fps_rgb = point_rgb[fps_ds_idx]
 
@@ -135,8 +143,12 @@ def colorize_pointcloud(
 
     region_rgb_values = [[] for ci in range(num_points)]
     median_rgb_values = np.zeros([num_points, 3])
-    nearest_neighbours = nn.kneighbors(point_coords_rgb[:, :3], 1, return_distance=False).reshape(num_points_rgb)
-    nearest_neighbours_2 = nn_inverse.kneighbors(point_coords, 6, return_distance=False).reshape(num_points, 6)
+    nearest_neighbours = nn.kneighbors(
+        point_coords_rgb[:, :3], 1, return_distance=False
+    ).reshape(num_points_rgb)
+    nearest_neighbours_2 = nn_inverse.kneighbors(
+        point_coords, 6, return_distance=False
+    ).reshape(num_points, 6)
 
     for vi, ci in enumerate(nearest_neighbours):
         region_rgb_values[ci].append(point_coords_rgb[vi, 3:])
@@ -145,7 +157,9 @@ def colorize_pointcloud(
         if len(region_rgb_values[ci]) > 0:
             median_rgb_values[ci, :] = np.mean(region_rgb_values[ci], axis=0)
         else:
-            median_rgb_values[ci, :] = np.mean(point_coords_rgb[nearest_neighbours_2[ci], 3:], axis=0)
+            median_rgb_values[ci, :] = np.mean(
+                point_coords_rgb[nearest_neighbours_2[ci], 3:], axis=0
+            )
 
     return median_rgb_values
 

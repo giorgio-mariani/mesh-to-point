@@ -32,10 +32,10 @@ def render_view(view: ViewConfig, tmp_dir: Path, out_dir: Path):
 def render_dataset(cfg: GlobalConfig, views: list[ViewConfig]):
     # Prepare scene objects
     prepare_scene(cfg)
-        
+
     with tempfile.TemporaryDirectory() as tmp:
         render_dir = Path(tmp)
-    
+
         # Setup rendering parameters
         bpy.context.scene.render.engine = "CYCLES"
         bpy.context.scene.cycles.samples = cfg.samples

@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional
 
+
 @dataclass
 class CameraConfig:
     origin: tuple[float, float, float]
@@ -10,12 +11,14 @@ class CameraConfig:
     y: tuple[float, float, float]
     z: tuple[float, float, float]
 
+
 @dataclass
 class LightConfig:
     origin: tuple[float, float, float]
     color: tuple[float, float, float]
     intensity: float
     use_shadows: bool = True
+
 
 @dataclass
 class ViewConfig:
@@ -25,6 +28,7 @@ class ViewConfig:
     rgba: Optional[Path] = None
     mask: Optional[Path] = None
     normals: Optional[Path] = None
+
 
 @dataclass
 class GlobalConfig:

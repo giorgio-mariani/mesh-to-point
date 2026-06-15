@@ -75,7 +75,9 @@ def create_pointcloud_from_multiview(directory: Path, use_color: bool) -> np.nda
         camera_directions = camera_rays[:, 1]
         depth_directions = fd.camera.depth_directions(image_coords)
 
-        ray_scales = depth_image / np.sum(camera_directions * depth_directions, axis=-1, keepdims=True)
+        ray_scales = depth_image / np.sum(
+            camera_directions * depth_directions, axis=-1, keepdims=True
+        )
         coords_3d = camera_origins + camera_directions * ray_scales
         all_3d_coords.append(coords_3d)
 

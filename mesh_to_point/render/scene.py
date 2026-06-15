@@ -10,18 +10,19 @@ from mesh_to_point.render.config import LightConfig, GlobalConfig, CameraConfig
 
 class MeshFormat(Enum):
     """Supported mesh file formats."""
-    GLTF = ('gltf', 'import_scene','gltf')
-    GLB = ('glb', 'import_scene','gltf')
-    OBJ = ('obj', 'import_scene','obj')
-    FBX = ('fbx', 'import_scene','fbx')
-    PLY = ('ply', 'import_mesh','ply')
-    STL = ('stl', 'import_mesh','stl')
-    
-    def __init__(self, extension: str, load_module:str, load_operator:str):
+
+    GLTF = ("gltf", "import_scene", "gltf")
+    GLB = ("glb", "import_scene", "gltf")
+    OBJ = ("obj", "import_scene", "obj")
+    FBX = ("fbx", "import_scene", "fbx")
+    PLY = ("ply", "import_mesh", "ply")
+    STL = ("stl", "import_mesh", "stl")
+
+    def __init__(self, extension: str, load_module: str, load_operator: str):
         self.extension = extension
         self.load_module = load_module
         self.load_operator = load_operator
-    
+
     @classmethod
     def from_string(cls, format_str: str):
         """Convert a string (e.g., 'gltf', 'glb') to a MeshFormat enum member."""
@@ -29,10 +30,12 @@ class MeshFormat(Enum):
         for member in cls:
             if member.extension == format_str:
                 return member
-        raise ValueError(f"Unsupported format: {format_str}. Supported: {[m.extension for m in cls]}")
+        raise ValueError(
+            f"Unsupported format: {format_str}. Supported: {[m.extension for m in cls]}"
+        )
 
 
-def _scene_bounding_box(single_obj=None, ignore_matrix=False) -> Tuple[Vector,Vector]:
+def _scene_bounding_box(single_obj=None, ignore_matrix=False) -> Tuple[Vector, Vector]:
     def scene_meshes():
         for obj in bpy.context.scene.objects.values():
             if isinstance(obj.data, (bpy.types.Mesh)):
@@ -80,9 +83,6 @@ def _normalize_scene():
     bpy.ops.object.select_all(action="DESELECT")
 
 
-
-
-
 def _create_camera():
     # https://b3d.interplanety.org/en/how-to-create-camera-through-the-blender-python-api/
     camera_data = bpy.data.cameras.new(name="Camera")
@@ -116,34 +116,63 @@ def _set_background_color(color: tuple, strength: float):
     background_node.inputs["Strength"].default_value = strength
 
 
+def _override_alpha_val(alpha: float):
+    for obj in bpy.context.scene.objects.values():
+        if isinstance(obj.data, bpy.types.Mesh):
+
+            # Remove existing materials and add a new one
+            # obj.data.materials.clear()
+            # mat = bpy.data.materials.new(name="VertexColored")
+            # obj.data.materials.append(mat)
+
+            for mat in obj.data.materials:
+                mat.use_nodes = True
+
+                # There should be a Principled BSDF by default.
+                bsdf_node = None
+                for node in mat.node_tree.nodes:
+                    if node.type == "BSDF_PRINCIPLED":
+                        bsdf_node = node
+                assert (
+                    bsdf_node is not None
+                ), "material has no Principled BSDF node to modify"
+
+                bsdf_node.inputs["Alpha"].default_value = alpha
+                # mat_index = len(obj.data.materials)
+                # polygon_num = len(obj.data.polygons)
+                # for i in range(polygon_num):
+                #    obj.data.polygons[i].material_index = mat_index
+
+
 def load_input_mesh(mesh_path: str, format: MeshFormat | str, kwargs: dict):
     """Load mesh in the current blender scene.
-    
+
     Args:
         mesh_path: Path to the mesh file
         format: Mesh format (MeshFormat enum or string like 'gltf', 'obj', etc.)
         kwargs: Additional keyword arguments to pass to the importer
-    
+
     Returns:
         List of imported objects
     """
     # Convert string to enum if needed
     if isinstance(format, str):
         format = MeshFormat.from_string(format)
-    
+
     # Get the operator function
     importer = getattr(getattr(bpy.ops, format.load_module), format.load_operator)
-    
+
     # Store the current objects to identify new ones
     objects_before = set(bpy.context.scene.objects)
-    
+
     # Call the importer
     importer(filepath=str(mesh_path), **kwargs)
-    
+
     # Return the newly imported objects
     imported_objects = list(set(bpy.context.scene.objects) - objects_before)
-    
+
     return imported_objects
+
 
 def update_camera(cam_obj, cfg: CameraConfig):
     """Update a Blender camera object to match a :class:`CameraConfig`.
@@ -197,13 +226,13 @@ def prepare_scene(cfg: GlobalConfig):
     # Cleanup scene
     bpy.ops.object.select_all(action="SELECT")
     bpy.ops.object.delete()
-    
+
     # Load input object
     bpy.ops.import_scene.gltf(filepath=str(cfg.mesh))
     _normalize_scene()
-    
+
     if cfg.force_alpha:
-        override_alpha_val(cfg.force_alpha_value)
+        _override_alpha_val(cfg.force_alpha_value)
 
     for light in cfg.lights:
         _create_light(light)

@@ -177,7 +177,9 @@ def override_alpha_val(alpha: float):
                 for node in mat.node_tree.nodes:
                     if node.type == "BSDF_PRINCIPLED":
                         bsdf_node = node
-                assert bsdf_node is not None, "material has no Principled BSDF node to modify"
+                assert (
+                    bsdf_node is not None
+                ), "material has no Principled BSDF node to modify"
 
                 bsdf_node.inputs["Alpha"].default_value = alpha
                 # mat_index = len(obj.data.materials)
@@ -218,7 +220,9 @@ def setup_scene(render_config: MultiViewRenderingConfig, rendering_dir: str):
     # Create scene lights
     for light in render_config.lights:
         create_light(light)
-    create_background_environment(render_config.background_color, render_config.background_strength)
+    create_background_environment(
+        render_config.background_color, render_config.background_strength
+    )
 
     # Create scene camera
     create_camera()
@@ -258,14 +262,23 @@ def setup_compositor(sv_config: SingleViewConfig, rendering_dir: str):
         tree.links.new(input_node.outputs["Alpha"], math_node.inputs[0])
         math_node.inputs[1].default_value = 0.0001
         create_outputfile_subgraph(
-            math_node.outputs["Value"], tree, f"{rendering_dir}/alpha", "BW", file_format="PNG", color_depth="8"
+            math_node.outputs["Value"],
+            tree,
+            f"{rendering_dir}/alpha",
+            "BW",
+            file_format="PNG",
+            color_depth="8",
         )
 
     if sv_config.depth_pass:
-        create_outputfile_subgraph(input_node.outputs["Depth"], tree, f"{rendering_dir}/depth", "BW")
+        create_outputfile_subgraph(
+            input_node.outputs["Depth"], tree, f"{rendering_dir}/depth", "BW"
+        )
 
     if sv_config.normal_pass:
-        create_outputfile_subgraph(input_node.outputs["Normal"], tree, f"{rendering_dir}/normal")
+        create_outputfile_subgraph(
+            input_node.outputs["Normal"], tree, f"{rendering_dir}/normal"
+        )
 
 
 def render_and_store(

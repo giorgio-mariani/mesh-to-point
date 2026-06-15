@@ -64,19 +64,25 @@ class ProjectiveCamera(Camera):
 
     def image_coords(self) -> np.ndarray:
         ind = np.arange(self.width * self.height)
-        coords = np.stack([ind % self.width, ind // self.width], axis=1).astype(np.float32)
+        coords = np.stack([ind % self.width, ind // self.width], axis=1).astype(
+            np.float32
+        )
         return coords
 
     def camera_rays(self, coords: np.ndarray) -> np.ndarray:
         # Normalize coordinates between -1 and +1 (both in the x and y axes)
-        fracs = (coords / (np.array([self.width, self.height], dtype=np.float32) - 1)) * 2 - 1
+        fracs = (
+            coords / (np.array([self.width, self.height], dtype=np.float32) - 1)
+        ) * 2 - 1
 
         # Apply focal length transform?
         fracs = fracs * np.tan(np.array([self.x_fov, self.y_fov]) / 2)
         directions = self.z + self.x * fracs[:, :1] + self.y * fracs[:, 1:]
         directions = directions / np.linalg.norm(directions, axis=-1, keepdims=True)
 
-        return np.stack([np.broadcast_to(self.origin, directions.shape), directions], axis=1)
+        return np.stack(
+            [np.broadcast_to(self.origin, directions.shape), directions], axis=1
+        )
 
     def depth_directions(self, coords: np.ndarray) -> np.ndarray:
         return np.tile((self.z / np.linalg.norm(self.z))[None], [len(coords), 1])
