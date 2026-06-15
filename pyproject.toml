@@ -22,3 +22,8 @@ dev = [
 
 [tool.setuptools]
 packages = ["mesh_to_point"]
+
+[dependency-groups]
+dev = [
+    "pre-commit>=4.6.0",
+]
