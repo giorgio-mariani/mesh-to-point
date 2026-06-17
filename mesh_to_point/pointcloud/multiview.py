@@ -4,12 +4,13 @@ from typing import *
 import numpy as np
 import json
 
-from mesh_to_point.camera import ProjectiveCamera
+from mesh_to_point.camera import CameraModel, CameraPose, from_nerfstudio
 
 
 @dataclass
 class FrameData:
-    camera: ProjectiveCamera
+    camera_model: CameraModel
+    camera_pose: CameraPose
     depth_image: np.ndarray  # h*w x 1
     rgb_image: Optional[np.ndarray]  # h*w x 3
     alpha_image: Optional[np.ndarray]  # h*w x 1
@@ -50,12 +51,14 @@ def parse_data_directory(directory: Path) -> Generator[FrameData, None, None]:
         )
 
 
-def create_pointcloud_from_multiview(directory: Path, use_color: bool) -> np.ndarray:
+def merge_multiviews(
+    multiview_dir: Path | str, use_color: bool = True
+) -> Tuple[np.ndarray, np.ndarray]:
 
     all_3d_coords = []
     all_rgb_values = []
-    directory = Path(directory)
-    for fd in parse_data_directory(directory):
+    multiview_dir = Path(multiview_dir)
+    for fd in parse_data_directory(multiview_dir):
 
         # Create an array of integer (x, y) image coordinates for Camera methods.
         image_coords = fd.camera.image_coords()
@@ -122,7 +125,7 @@ def load_depth_file(filepath: str) -> np.ndarray:
     import OpenEXR
 
     (exr_part,) = OpenEXR.File(str(filepath)).parts
-    return np.array(exr_part.channels["V"].pixels).astype(np.float32).reshape(-1, 1)
+    return exr_part.channels["V"].pixels.reshape(-1, 1)
 
 
 def load_rgba_file(filepath: str) -> Tuple[np.ndarray, np.ndarray]:
@@ -132,3 +135,30 @@ def load_rgba_file(filepath: str) -> Tuple[np.ndarray, np.ndarray]:
     rgb = rgba[:, :, :3]
     alpha = rgba[:, :, 3:4]
     return rgb.reshape(-1, 3), alpha.reshape(-1, 1)
+
+
+def merge_multiviews(
+    multiview_diffuse_path: Path,
+    multiview_alpha_path: Optional[Path] = None,
+    num_points: int = 50000,
+    random_subsample_count: int = 2**18,
+) -> np.array:
+
+    point_coords_1, point_rgb = create_pc(multiview_diffuse_path, use_color=True)
+
+    if multiview_alpha_path is not None:
+        point_coords_2, _ = create_pc(multiview_alpha_path, use_color=True)
+        point_coords = np.concatenate([point_coords_1, point_coords_2], axis=0)
+    else:
+        point_coords = point_coords_1
+
+    point_coords_f, _ = subsample_pointcloud(
+        point_coords=point_coords,
+        num_points=num_points,
+        random_subsample_count=random_subsample_count,
+    )
+
+    point_rgb_f = colorize_pointcloud(
+        point_coords_f, np.concat([point_coords_1, point_rgb], axis=-1)
+    )
+    return np.concat([point_coords_f, point_rgb_f], axis=-1)
