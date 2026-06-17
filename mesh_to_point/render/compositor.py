@@ -1,24 +1,31 @@
 import bpy
 from pathlib import Path
-from .config import ViewConfig
+from .config import GlobalConfig
 
 
-def clear_nodes():
-    tree = bpy.context.scene.node_tree
-    for node in tree.nodes:
-        tree.nodes.remove(node)
-
-
-def add_output(node, path: Path, fmt="OPEN_EXR", mode="RGB", depth="16"):
-    out = bpy.context.scene.node_tree.nodes.new("CompositorNodeOutputFile")
-    out.format.file_format = fmt
+def add_output(
+    input_node,
+    output_path: Path,
+    image_format: str = "OPEN_EXR_MULTILAYER",
+    mode: str = "RGB",
+    depth: str = "32",
+    data_type: str = "FLOAT",
+):
+    data_name = str(output_path.name)
+    compositor_tree = bpy.context.scene.compositing_node_group
+    out = compositor_tree.nodes.new("CompositorNodeOutputFile")
+    out.format.file_format = image_format
     out.format.color_mode = mode
     out.format.color_depth = depth
-    out.base_path = str(path)
+    out.directory = str(output_path.parent.absolute())
+    out.file_name = data_name
+
+    out.file_output_items.new(data_type, "")
+    compositor_tree.links.new(input_node, out.inputs[""])
     return out
 
 
-def setup_compositor(view: ViewConfig, tmp_dir: Path):
+def setup_compositor(cfg: GlobalConfig, tmp_dir: Path):
     """Configure the compositor node tree for a single view.
 
         The function clears any existing nodes, creates a ``RLayers`` node to
@@ -47,21 +54,19 @@ def setup_compositor(view: ViewConfig, tmp_dir: Path):
         scene's node tree.
     """
 
-    clear_nodes()
-    tree = bpy.context.scene.node_tree
-    rl = tree.nodes.new("CompositorNodeRLayers")
+    scene = bpy.context.scene
 
-    if view.mask:
-        math = tree.nodes.new("CompositorNodeMath")
-        math.operation = "GREATER_THAN"
-        tree.links.new(rl.outputs["Alpha"], math.inputs[0])
-        math.inputs[1].default_value = 0.0001
-        add_output(
-            math.outputs["Value"], tmp_dir / "alpha", fmt="PNG", mode="BW", depth="8"
-        )
+    # Create compositor tree
+    comp_tree = bpy.data.node_groups.new("Compositor Tree", "CompositorNodeTree")
+    scene.compositing_node_group = comp_tree
 
-    if view.depth:
-        add_output(rl.outputs["Depth"], tmp_dir / "depth")
+    render_layers = comp_tree.nodes.new(type="CompositorNodeRLayers")
+    output = comp_tree.nodes.new(type="NodeGroupOutput")
 
-    if view.normals:
-        add_output(rl.outputs["Normal"], tmp_dir / "normal")
+    comp_tree.interface.new_socket(
+        name="Image", in_out="OUTPUT", socket_type="NodeSocketColor"
+    )
+    comp_tree.links.new(output.inputs["Image"], render_layers.outputs["Image"])
+
+    if cfg.depth_pass:
+        add_output(render_layers.outputs["Depth"], tmp_dir / "depth")

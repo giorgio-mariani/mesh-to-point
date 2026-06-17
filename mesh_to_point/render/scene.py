@@ -5,7 +5,8 @@ from typing import Tuple
 import bpy
 from mathutils import Vector
 
-from mesh_to_point.render.config import LightConfig, GlobalConfig, CameraConfig
+from mesh_to_point.camera import CameraPose
+from mesh_to_point.render.config import Light, GlobalConfig
 
 
 class MeshFormat(Enum):
@@ -92,7 +93,7 @@ def _create_camera():
     return camera_object
 
 
-def _create_light(light: LightConfig):
+def _create_light(light: Light):
     # https://blender.stackexchange.com/questions/215624/how-to-create-a-light-with-the-python-api-in-blender-2-92
     light_data = bpy.data.lights.new(name="Light", type="SUN")
     light_data.energy = light.intensity
@@ -174,7 +175,7 @@ def load_input_mesh(mesh_path: str, format: MeshFormat | str, kwargs: dict):
     return imported_objects
 
 
-def update_camera(cam_obj, cfg: CameraConfig):
+def update_camera(cam_obj, camera_pose: CameraPose):
     """Update a Blender camera object to match a :class:`CameraConfig`.
 
     The function applies the configuration to the camera's data block and
@@ -194,13 +195,18 @@ def update_camera(cam_obj, cfg: CameraConfig):
         the fourth column.  After the matrix is updated the view layer is
         refreshed to ensure the changes take effect immediately.
     """
-    cam_obj.data.sensor_fit = "HORIZONTAL"
-    cam_obj.data.angle = cfg.fov
-    cam_obj.location[:] = cfg.origin
-    cam_obj.matrix_world.col[0][:3] = cfg.x
-    cam_obj.matrix_world.col[1][:3] = cfg.y
-    cam_obj.matrix_world.col[2][:3] = cfg.z
-    cam_obj.matrix_world.col[3][:3] = cfg.origin
+
+    R = camera_pose.R
+    x, y, z = R.T
+
+    # TODO: setup the commented stuff
+    # cam_obj.data.sensor_fit = "HORIZONTAL"
+    # cam_obj.data.angle = camera_pose.fov
+    # cam_obj.location[:] = camera_pose.origin
+    cam_obj.matrix_world.col[0][:3] = x
+    cam_obj.matrix_world.col[1][:3] = y
+    cam_obj.matrix_world.col[2][:3] = z
+    cam_obj.matrix_world.col[3][:3] = camera_pose.t
     bpy.context.view_layer.update()
 
 
