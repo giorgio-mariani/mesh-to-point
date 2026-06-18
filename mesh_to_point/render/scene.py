@@ -1,6 +1,6 @@
 import math
 from enum import Enum
-from typing import Tuple
+from typing import *
 
 import bpy
 from mathutils import Vector
@@ -145,15 +145,22 @@ def _override_alpha_val(alpha: float):
                 #    obj.data.polygons[i].material_index = mat_index
 
 
-def load_input_mesh(mesh_path: str, format: MeshFormat | str, kwargs: dict):
+def load_input_mesh(mesh_path: str, format: MeshFormat | str, **kwargs: dict) -> List:
     """Load mesh in the current blender scene.
 
-    Args:
-        mesh_path: Path to the mesh file
-        format: Mesh format (MeshFormat enum or string like 'gltf', 'obj', etc.)
-        kwargs: Additional keyword arguments to pass to the importer
+    Supported mesh formats can be found in :class:`MeshFormat`.
 
-    Returns:
+    Parameters
+    ----------
+    mesh_path:
+        Path to the mesh file
+    format:
+        Mesh format (MeshFormat enum or string like 'gltf', 'obj', etc.)
+    kwargs:
+        Additional keyword arguments to pass to the importer
+
+    Returns
+    -------
         List of imported objects
     """
     # Convert string to enum if needed
@@ -175,25 +182,19 @@ def load_input_mesh(mesh_path: str, format: MeshFormat | str, kwargs: dict):
     return imported_objects
 
 
-def update_camera(cam_obj, camera_pose: CameraPose):
-    """Update a Blender camera object to match a :class:`CameraConfig`.
+def update_camera(camera_obj, camera_pose: CameraPose) -> None:
+    """Update a Blender camera object to match the provided extrinsic parameters.
 
-    The function applies the configuration to the camera's data block and
-    world matrix.  It is intended to be used after a camera has been
-    created (e.g. by :func:`create_camera`) and before rendering.
+    The function applies the input extrinsic parameters to the blender
+    scene camera.
 
-    Args:
-        cam_obj : :class:`bpy.types.Object`
-            The camera object to update.
-        cfg : :class:`CameraConfig`
-            Configuration containing the camera's position, orientation
-            basis vectors and field-of-view.
+    Parameters
+    ----------
+    camera_obj:
+        The blender camera object to update.
+    camera_pose: CameraPose
+        The camera's extrinsic parameters.
 
-    Notes:
-        The function updates the camera's world matrix by assigning the
-        provided basis vectors to the first three columns and the origin to
-        the fourth column.  After the matrix is updated the view layer is
-        refreshed to ensure the changes take effect immediately.
     """
 
     R = camera_pose.R
@@ -203,14 +204,14 @@ def update_camera(cam_obj, camera_pose: CameraPose):
     # cam_obj.data.sensor_fit = "HORIZONTAL"
     # cam_obj.data.angle = camera_pose.fov
     # cam_obj.location[:] = camera_pose.origin
-    cam_obj.matrix_world.col[0][:3] = x
-    cam_obj.matrix_world.col[1][:3] = y
-    cam_obj.matrix_world.col[2][:3] = z
-    cam_obj.matrix_world.col[3][:3] = camera_pose.t
+    camera_obj.matrix_world.col[0][:3] = x
+    camera_obj.matrix_world.col[1][:3] = y
+    camera_obj.matrix_world.col[2][:3] = z
+    camera_obj.matrix_world.col[3][:3] = camera_pose.t
     bpy.context.view_layer.update()
 
 
-def prepare_scene(cfg: GlobalConfig):
+def prepare_scene(cfg: GlobalConfig) -> None:
     """Prepare the Blender scene according to the provided configuration.
 
     This function performs the following steps:
@@ -224,10 +225,11 @@ def prepare_scene(cfg: GlobalConfig):
     6. Sets the world background colour and strength from ``cfg.background_*``.
     7. Creates a default camera.
 
-    Args:
-        cfg : GlobalConfig
-            Configuration object containing mesh path, lighting, background and
-            optional alpha override settings.
+    Parameters
+    ----------
+    cfg: GlobalConfig
+        Configuration object containing mesh path, lighting, background camera
+        parameters.
     """
     # Cleanup scene
     bpy.ops.object.select_all(action="SELECT")
