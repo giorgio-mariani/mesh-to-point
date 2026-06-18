@@ -158,7 +158,7 @@ def write_json(
 
     for pose in camera_poses:
         # Nerfstudio expects a 4x4 camera‑to‑world matrix.
-        matrix = pose.cam_to_world.tolist()
+        matrix = pose.world_to_cam.tolist()
         data["frames"].append(
             {
                 "file_path": f"images/{pose.camera_id:04}_rgba.png",
