@@ -101,7 +101,7 @@ def _create_light(light: Light):
     light_data.use_shadow = light.use_shadows
     light_object = bpy.data.objects.new(name="Light", object_data=light_data)
 
-    direction = -light.origin
+    direction = -Vector(light.origin)
     rot_quat = direction.to_track_quat("-Z", "Y")
     light_object.rotation_euler = rot_quat.to_euler()
     bpy.context.view_layer.update()
