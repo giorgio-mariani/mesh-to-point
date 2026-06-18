@@ -3,6 +3,7 @@ from pathlib import Path
 
 import bpy
 
+from mesh_to_point.render.io import write_cameras_txt, write_images_txt, write_json
 from mesh_to_point.render.scene import prepare_scene, update_camera
 from mesh_to_point.render.compositor import setup_compositor
 from mesh_to_point.render.config import GlobalConfig
@@ -60,14 +61,19 @@ def render_dataset(cfg: GlobalConfig) -> None:
     ``cfg.output_dir``.
     """
 
-    # Ensure output directory exists and is empty
+    # Ensure output directory doesn't exists or is empty
     out_dir = cfg.output_dir
-    if out_dir.exists():
-        # If directory is not empty, raise an error to avoid overwriting
-        if any(out_dir.iterdir()):
-            raise RuntimeError(f"Output directory '{out_dir}' is not empty.")
+    if out_dir.exists() and any(out_dir.iterdir()):
+        raise RuntimeError(f"Output directory '{out_dir}' is not empty.")
     else:
         out_dir.mkdir(parents=True, exist_ok=True)
+
+    (out_dir / "images").mkdir()
+    (out_dir / "sparse").mkdir()
+
+    write_cameras_txt(out_dir / "sparse/cameras.txt", [cfg.camera])
+    write_images_txt(out_dir / "sparse/images.txt", cfg.camera_poses)
+    write_json(out_dir / "transform.json", cfg.camera, cfg.camera_poses)
 
     # Prepare scene objects
     prepare_scene(cfg)
@@ -93,4 +99,4 @@ def render_dataset(cfg: GlobalConfig) -> None:
         setup_compositor(cfg, render_dir)
 
         for view_index in range(len(cfg.camera_poses)):
-            _render_view(cfg, view_index, render_dir, cfg.output_dir)
+            _render_view(cfg, view_index, render_dir, cfg.output_dir / "images")
