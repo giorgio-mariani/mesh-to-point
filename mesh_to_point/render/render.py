@@ -73,7 +73,7 @@ def render_dataset(cfg: GlobalConfig) -> None:
 
     write_cameras_txt(out_dir / "sparse/cameras.txt", [cfg.camera])
     write_images_txt(out_dir / "sparse/images.txt", cfg.camera_poses)
-    write_json(out_dir / "transform.json", cfg.camera, cfg.camera_poses)
+    write_json(out_dir / "transforms.json", cfg.camera, cfg.camera_poses)
 
     # Prepare scene objects
     prepare_scene(cfg)
