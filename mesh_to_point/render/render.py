@@ -1,4 +1,5 @@
 import tempfile
+import shutil
 from pathlib import Path
 
 import bpy
@@ -28,11 +29,11 @@ def _render_view(
 
     view_id = "{:04d}".format(camera_pose.image_id)
 
-    # Move outputs to respective filenames
-    (render_dir / "rgba.png").rename(out_dir / f"{view_id}_rgba.png")
+    # Move outputs to respective filenames (using copy for cross-device compatibility)
+    shutil.copy(render_dir / "rgba.png", out_dir / f"{view_id}_rgba.png")
 
     if cfg.depth_pass:
-        (render_dir / "depth.exr").rename(out_dir / f"{view_id}_depth.exr")
+        shutil.copy(render_dir / "depth.exr", out_dir / f"{view_id}_depth.exr")
 
 
 def render_dataset(cfg: GlobalConfig) -> None:
