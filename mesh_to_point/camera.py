@@ -16,13 +16,13 @@ class CameraPose:
     image_id: int
     camera_id: int
 
-    # World-to-camera transform, as stored natively by COLMAP:
-    #   X_cam = R @ X_world + t
+    # camera-to-world transform
+    #   X_world = R @ X_cam + t
     R: np.ndarray  # (3, 3)
     t: np.ndarray  # (3,)
 
     @property
-    def world_to_cam(self) -> np.ndarray:
+    def cam_to_world(self) -> np.ndarray:
         """4x4 world-to-camera matrix."""
         T = np.eye(4)
         T[:3, :3] = self.R
@@ -30,7 +30,7 @@ class CameraPose:
         return T
 
     @property
-    def cam_to_world(self) -> np.ndarray:
+    def world_to_cam(self) -> np.ndarray:
         """4x4 camera-to-world matrix (common convention for NeRF, etc.)."""
         T = np.eye(4)
         R_c2w = self.R.T
@@ -72,31 +72,45 @@ class CameraModel:
         coords = np.stack([ind % self.width, ind // self.width], axis=1)
         return coords.astype(np.float32)
 
-    def camera_rays(self, camera_pose: CameraPose, coords: np.ndarray) -> np.ndarray:
+    def camera_rays(
+        self, camera_pose: CameraPose, coords: np.ndarray
+    ) -> Tuple[np.ndarray, np.ndarray]:
         """
         For every (x, y) coordinate in a rendered image, compute the ray of the
-        corresponding pixel.
+        corresponding pixel in world space.
 
-        :param coords: an [N x 2] integer array of 2D image coordinates.
-        :return: an [N x 2 x 3] array of [2 x 3] (origin, direction) tuples.
-                 The direction should always be unit length.
+        Parameters
+        ----------
+        coords : np.ndarray
+            Shape (N, 2) integer pixel coordinates.
+
+        Returns
+        -------
+        origins : np.ndarray
+            Shape (N, 3) world‑space ray origins (camera centre).
+        directions : np.ndarray
+            Shape (N, 3) unit‑length world‑space ray directions.
         """
-        x, y, z = camera_pose.R.T
-        x_fov = 2 * math.atan(self.width / (2 * self.fx))
-        y_fov = 2 * math.atan(self.height / (2 * self.fy))
+        # 1. Pixel → camera‑space direction
+        #    (x - cx) / fx, (y - cy) / fy, 1
+        u = (coords[:, 0] - self.cx) / self.fx
+        v = (coords[:, 1] - self.cy) / self.fy
+        dirs_cam = np.stack([u, v, np.ones_like(u)], axis=1)
 
-        # Normalize coordinates between -1 and +1 (both in the x and y axes)
-        fracs = (
-            coords / (np.array([self.width, self.height], dtype=np.float32) - 1)
-        ) * 2 - 1
+        # 2. Normalise
+        dirs_cam = dirs_cam / np.linalg.norm(dirs_cam, axis=1, keepdims=True)
 
-        fracs = fracs * np.tan(np.array([x_fov, y_fov]) / 2)
-        directions = z + x * fracs[:, :1] + y * fracs[:, 1:]
-        directions = directions / np.linalg.norm(directions, axis=-1, keepdims=True)
+        # 3. Camera → world
+        R = camera_pose.cam_to_world[:3, :3]
+        R[:, 1] *= -1
+        R[:, 2] *= -1
+        dirs_world = dirs_cam @ R.T  # (N,3)
 
-        return np.stack(
-            [np.broadcast_to(self.origin, directions.shape), directions], axis=1
-        )
+        # 4. Ray origins (camera centre)
+        origin = camera_pose.cam_to_world[:3, 3]  # (3,)
+        origins = np.tile(origin, (len(coords), 1))
+
+        return origins, dirs_world
 
     def depth_directions(
         self, camera_pose: CameraPose, coords: np.ndarray
@@ -112,52 +126,8 @@ class CameraModel:
         :return: an [N x 3] array of normalized depth directions.
         """
 
-        _, _, z = camera_pose.R.T
+        _, _, z = -camera_pose.R.T
         return np.tile((z / np.linalg.norm(z))[None], [len(coords), 1])
-
-
-@dataclass
-class Camera(ABC):
-    """
-    An object describing how a camera corresponds to pixels in an image.
-    """
-
-    @abstractmethod
-    def image_coords(self) -> np.ndarray:
-        """
-        :return: ([self.height, self.width, 2]).reshape(self.height * self.width, 2) image coordinates
-        """
-
-    @abstractmethod
-    def camera_rays(self, coords: np.ndarray) -> np.ndarray:
-        """
-        For every (x, y) coordinate in a rendered image, compute the ray of the
-        corresponding pixel.
-
-        :param coords: an [N x 2] integer array of 2D image coordinates.
-        :return: an [N x 2 x 3] array of [2 x 3] (origin, direction) tuples.
-                 The direction should always be unit length.
-        """
-
-    def depth_directions(self, coords: np.ndarray) -> np.ndarray:
-        """
-        For every (x, y) coordinate in a rendered image, get the direction that
-        corresponds to "depth" in an RGBD rendering.
-
-        This may raise an exception if there is no "D" channel in the
-        corresponding ViewData.
-
-        :param coords: an [N x 2] integer array of 2D image coordinates.
-        :return: an [N x 3] array of normalized depth directions.
-        """
-        _ = coords
-        raise NotImplementedError
-
-
-def from_COLMAP(camera_file: Path) -> Tuple[CameraModel, List[CameraPose]]:
-    """Read a camera_file in the COLMAP format."""
-    ...
-    # TODO
 
 
 def from_nerfstudio(camera_file: Path) -> Tuple[CameraModel, List[CameraPose]]:
