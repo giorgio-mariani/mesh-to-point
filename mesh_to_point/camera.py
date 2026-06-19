@@ -117,7 +117,8 @@ class CameraModel:
         return origins, dirs_world
 
 
-def from_json(camera_file: Path) -> Tuple[CameraModel, List[CameraPose]]:
+def from_json(camera_file: str | Path) -> Tuple[CameraModel, List[CameraPose]]:
+    camera_file = Path(camera_file)
     with open(camera_file, "r") as fp:
         camera_data = json.load(fp)
         camera_id = 0
@@ -158,11 +159,10 @@ def from_json(camera_file: Path) -> Tuple[CameraModel, List[CameraPose]]:
                 img_path = Path(camera_file.parent, p["file_path"])
                 if not img_path.is_file():
                     warnings.warn(
-                        f"Image file '{img_path}' referenced in frame {img_id} "
+                        f"Image file '{img_path}' referenced in frame {img_id}: "
                         f"This parameter will be ignored.",
                         RuntimeWarning,
                     )
-                break
 
             transform_matrix = np.array(p["transform_matrix"])
             R = transform_matrix[:3, :3]
