@@ -4,7 +4,7 @@ from typing import *
 import numpy as np
 import json
 
-from mesh_to_point.camera import CameraModel, CameraPose, from_nerfstudio
+from mesh_to_point.camera import CameraModel, CameraPose, from_json
 from mesh_to_point.pointcloud.misc import colorize_pointcloud, subsample_pointcloud
 
 
@@ -20,16 +20,17 @@ class ViewData:
 def load_multiview_images(camera_file: str | Path) -> Generator[ViewData, None, None]:
     camera_file = Path(camera_file)
 
-    camera_model, camera_poses = from_nerfstudio(camera_file)
+    camera_model, camera_poses = from_json(camera_file)
 
     for pose in camera_poses:
-        file_prefix = camera_file.parent / f"{pose.image_id:04d}"
+        file_prefix = camera_file.parent / f"images/{pose.image_id:04d}"
         rgb_data, alpha_data = load_rgba_file(f"{file_prefix}_rgba.png")
         # TODO: check depth file exists
         depth_data = load_depth_file(f"{file_prefix}_depth.exr")
 
         yield ViewData(
-            camera_model,
+            camera_model=camera_model,
+            camera_pose=pose,
             depth_image=depth_data,
             rgb_image=rgb_data,
             alpha_image=alpha_data,
@@ -57,16 +58,18 @@ def merge_multiviews(multiview_dir: str | Path) -> Tuple[np.ndarray, np.ndarray]
         rgb_values = fd.rgb_image[image_mask]
 
         # Use the depth and camera information to compute the coordinates corresponding to every visible pixel.
-        camera_rays = fd.camera_model.camera_rays(fd.camera_pose, image_coords)
-        camera_origins, camera_directions = camera_rays[:, 0], camera_rays[:, 1]
-        depth_directions = fd.camera_model.depth_directions(
+        camera_origins, camera_directions = fd.camera_model.camera_rays(
             fd.camera_pose, image_coords
         )
 
-        ray_scales = depth_values / np.sum(
-            camera_directions * depth_directions, axis=-1, keepdims=True
-        )
-        coords_3d = camera_origins + camera_directions * ray_scales
+        # Compute length of the ray using the image's z-values
+        _, _, z = fd.camera_pose.cam_to_world[:3, :3].T
+        depth_forward = -z / np.linalg.norm(z)
+        ray_cosine = (camera_directions @ depth_forward).reshape(-1, 1)
+        ray_length = depth_values / ray_cosine
+
+        # Compute 3D coordinates for current pose
+        coords_3d = camera_origins + camera_directions * ray_length
 
         # Update cumulative data
         all_3d_coords.append(coords_3d)
