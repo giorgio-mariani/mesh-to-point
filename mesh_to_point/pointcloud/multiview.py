@@ -5,10 +5,11 @@ import numpy as np
 import json
 
 from mesh_to_point.camera import CameraModel, CameraPose, from_nerfstudio
+from mesh_to_point.pointcloud.misc import colorize_pointcloud, subsample_pointcloud
 
 
 @dataclass
-class FrameData:
+class ViewData:
     camera_model: CameraModel
     camera_pose: CameraPose
     depth_image: np.ndarray  # h*w x 1
@@ -16,52 +17,34 @@ class FrameData:
     alpha_image: Optional[np.ndarray]  # h*w x 1
 
 
-def parse_data_directory(directory: Path) -> Generator[FrameData, None, None]:
-    with open(directory / "transforms.json") as fp:
-        data = json.load(fp)
+def load_multiview_images(camera_file: str | Path) -> Generator[ViewData, None, None]:
+    camera_file = Path(camera_file)
 
-    camera_model = data["camera_model"]
-    for frame_data in data["frames"]:
+    camera_model, camera_poses = from_nerfstudio(camera_file)
 
-        tmatrix = np.array(frame_data["transform_matrix"])
-        camera = load_camera(
-            camera_type=camera_model,
-            origin=np.array(tmatrix[:3, 3]),
-            x=np.array(tmatrix[:3, 0]),
-            y=np.array(tmatrix[:3, 1]) * -1,  # Invert y-axis for camera coordinates
-            z=np.array(tmatrix[:3, 2]) * -1,  # Invert z-axis for camera coordinates
-            width=data["w"],
-            height=data["h"],
-            focal_length_x=data["fl_x"],
-            focal_length_y=data["fl_y"],
-        )
+    for pose in camera_poses:
+        file_prefix = camera_file.parent / f"{pose.image_id:04d}"
+        rgb_data, alpha_data = load_rgba_file(f"{file_prefix}_rgba.png")
+        # TODO: check depth file exists
+        depth_data = load_depth_file(f"{file_prefix}_depth.exr")
 
-        depth_data = load_depth_file(directory / frame_data["depth_file_path"])
-
-        if "file_path" in frame_data:
-            rgb_data, alpha_data = load_rgba_file(directory / frame_data["file_path"])
-        else:
-            rgb_data, alpha_data = None, None
-
-        yield FrameData(
-            camera,
+        yield ViewData(
+            camera_model,
             depth_image=depth_data,
             rgb_image=rgb_data,
             alpha_image=alpha_data,
         )
 
 
-def merge_multiviews(
-    multiview_dir: Path | str, use_color: bool = True
-) -> Tuple[np.ndarray, np.ndarray]:
+def merge_multiviews(multiview_dir: str | Path) -> Tuple[np.ndarray, np.ndarray]:
 
     all_3d_coords = []
     all_rgb_values = []
     multiview_dir = Path(multiview_dir)
-    for fd in parse_data_directory(multiview_dir):
+    for fd in load_multiview_images(multiview_dir / "transforms.json"):
 
         # Create an array of integer (x, y) image coordinates for Camera methods.
-        image_coords = fd.camera.image_coords()
+        image_coords = fd.camera_model.image_coords()
 
         # Select subset of pixels that have meaningful depth/color.
         image_mask = fd.depth_image <= 20.0
@@ -70,55 +53,29 @@ def merge_multiviews(
 
         image_mask = image_mask.reshape(-1)
         image_coords = image_coords[image_mask]
-        depth_image = fd.depth_image[image_mask]
+        depth_values = fd.depth_image[image_mask]
+        rgb_values = fd.rgb_image[image_mask]
 
         # Use the depth and camera information to compute the coordinates corresponding to every visible pixel.
-        camera_rays = fd.camera.camera_rays(image_coords)
-        camera_origins = camera_rays[:, 0]
-        camera_directions = camera_rays[:, 1]
-        depth_directions = fd.camera.depth_directions(image_coords)
+        camera_rays = fd.camera_model.camera_rays(fd.camera_pose, image_coords)
+        camera_origins, camera_directions = camera_rays[:, 0], camera_rays[:, 1]
+        depth_directions = fd.camera_model.depth_directions(
+            fd.camera_pose, image_coords
+        )
 
-        ray_scales = depth_image / np.sum(
+        ray_scales = depth_values / np.sum(
             camera_directions * depth_directions, axis=-1, keepdims=True
         )
         coords_3d = camera_origins + camera_directions * ray_scales
-        all_3d_coords.append(coords_3d)
 
-        if use_color:
-            all_rgb_values.append(fd.rgb_image[image_mask])
+        # Update cumulative data
+        all_3d_coords.append(coords_3d)
+        all_rgb_values.append(rgb_values)
 
     coords = np.concatenate(all_3d_coords, axis=0)
-    if use_color:
-        rgb_values = np.concatenate(all_rgb_values, axis=0)
-    else:
-        rgb_values = None
+    rgb_values = np.concatenate(all_rgb_values, axis=0)
+
     return coords, rgb_values
-
-
-def load_camera(
-    camera_type: str,
-    origin: np.ndarray,
-    x: np.ndarray,
-    y: np.ndarray,
-    z: np.ndarray,
-    width: int,
-    height: int,
-    focal_length_x: float,
-    focal_length_y: float,
-) -> ProjectiveCamera:
-
-    assert camera_type == "PINHOLE"
-
-    return ProjectiveCamera(
-        origin=origin,
-        x=x,
-        y=y,
-        z=z,
-        height=height,
-        width=width,
-        x_fov=2 * np.arctan(width / 2 / focal_length_x),
-        y_fov=2 * np.arctan(height / 2 / focal_length_y),
-    )
 
 
 def load_depth_file(filepath: str) -> np.ndarray:
@@ -137,17 +94,17 @@ def load_rgba_file(filepath: str) -> Tuple[np.ndarray, np.ndarray]:
     return rgb.reshape(-1, 3), alpha.reshape(-1, 1)
 
 
-def merge_multiviews(
-    multiview_diffuse_path: Path,
+def create_pointcloud_from_multiview(
+    multiview_rgb_path: Path,
     multiview_alpha_path: Optional[Path] = None,
     num_points: int = 50000,
     random_subsample_count: int = 2**18,
 ) -> np.array:
 
-    point_coords_1, point_rgb = create_pc(multiview_diffuse_path, use_color=True)
+    point_coords_1, point_rgb = merge_multiviews(multiview_rgb_path)
 
     if multiview_alpha_path is not None:
-        point_coords_2, _ = create_pc(multiview_alpha_path, use_color=True)
+        point_coords_2, _ = merge_multiviews(multiview_alpha_path, use_color=True)
         point_coords = np.concatenate([point_coords_1, point_coords_2], axis=0)
     else:
         point_coords = point_coords_1
