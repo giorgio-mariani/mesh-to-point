@@ -135,3 +135,28 @@ def farthest_point_sample(
         cur_distances = np.minimum(cur_distances, compute_dists(cur_idx))
 
     return indices
+
+
+def create_pointcloud_figure(pointcloud: np.ndarray) -> "plotly.graph_objects.Figure":
+    import plotly.graph_objects as go
+
+    assert pointcloud.shape[-1] == 6
+    assert len(pointcloud.shape) == 2
+    xyz = pointcloud[:, :3]
+    x, y, z = xyz.T
+
+    color = [f"rgb({r},{g},{b})" for (r, g, b) in np.uint8(pointcloud[:, 3:] * 255.0)]
+
+    fig = go.Figure(
+        dict(
+            type="scatter3d",
+            mode="markers",
+            x=x,
+            y=y,
+            z=z,
+            marker=dict(size=1, color=color),
+        )
+    )
+
+    fig.update_scenes(aspectmode="data")
+    return fig

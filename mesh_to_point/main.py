@@ -1,28 +1,144 @@
 import argparse
-
+from pathlib import Path
 import numpy as np
 
-from mesh_to_point.utils import create_pointcloud_from_mesh
+from mesh_to_point.camera import read_camera_config
+from mesh_to_point.io.data import write_ply
+from mesh_to_point.lights import read_light_config
+from mesh_to_point.pointcloud.misc import create_pointcloud_figure
+from mesh_to_point.render.render import render_dataset
+from mesh_to_point.pointcloud.multiview import create_pointcloud_from_multiview
+from mesh_to_point.render.config import GlobalConfig
+
+ASSETS_DIR = Path(__file__).parent.parent / "assets"
 
 
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--input-path", required=True, type=str)
+def _parse_args() -> argparse.Namespace:
+    """Parse command-line arguments for the CLI.
+
+    The CLI accepts the following options:
+    - ``--mesh``: Path to the mesh file to render.
+    - ``--camera-config``: Path to a camera configuration JSON (e.g. ``transforms.json``).
+    - ``--lights-config``: Path to a lights configuration JSON.
+    - ``--output-dir``: Base directory where rendered images and pointcloud will be stored.
+    - ``--points``: Number of points to keep in the final pointcloud.
+    - ``--subsample``: Random subsample count used during pointcloud construction.
+    - ``--samples``: Number of samples for Blender Cycles rendering.
+    - ``--no-gpu``: Disable GPU rendering.
+    """
+    parser = argparse.ArgumentParser(
+        description="Render a mesh and generate a pointcloud."
+    )
     parser.add_argument(
-        "--output-path", required=False, type=str, default="pointcloud.npy"
+        "--mesh", required=True, type=Path, help="Path to the mesh file."
     )
-    parser.add_argument("--num-images", type=int, default=20)
-    parser.add_argument("--num-points", type=int, default=8192)
-    args = parser.parse_args()
+    parser.add_argument(
+        "--cameras",
+        required=False,
+        type=Path,
+        default=ASSETS_DIR / "cameras.json",
+        help="Path to the camera configuration JSON (e.g. transforms.json).",
+    )
+    parser.add_argument(
+        "--lights",
+        required=False,
+        type=Path,
+        default=ASSETS_DIR / "lights.json",
+        help="Path to the lights configuration JSON.",
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        help="Base directory for rendered images and pointcloud output. If omitted, it will default to `output`.",
+    )
+    parser.add_argument(
+        "--points",
+        type=int,
+        default=50000,
+        help="Number of points in the pointcloud.",
+    )
+    parser.add_argument(
+        "--samples",
+        type=int,
+        default=64,
+        help="Number of samples for Blender Cycles rendering.",
+    )
+    parser.add_argument(
+        "--no-gpu",
+        action="store_true",
+        help="Disable GPU rendering (use CPU instead).",
+    )
+    parser.add_argument(
+        "--no-pointcloud",
+        action="store_true",
+        help="Skip pointcloud generation after rendering.",
+    )
+    parser.add_argument(
+        "--as-ply",
+        action="store_true",
+        help="Store the pointcloud as text PLY file, otherwise the pointcloud is stored as a numpy (`.npy`) Nx6 array.",
+    )
+    parser.add_argument(
+        "--html",
+        action="store_true",
+        help="Stora an HTML pointcloud visualization alongside the pointcloud.",
+    )
+    return parser.parse_args()
 
-    pointcloud = create_pointcloud_from_mesh(
-        mesh_path=args.input_path,
-        num_points=args.num_points,
-        num_views=args.num_images,
+
+def main() -> None:
+    args = _parse_args()
+
+    # Load camera and lights configuration
+    camera, camera_poses = read_camera_config(args.cameras)
+    background_light, lights = read_light_config(args.lights)
+
+    # Build global configuration for rendering
+    # Resolve output directory, creating a temporary one if not provided
+    output_dir = args.output_dir or Path("output")
+    if args.output_dir is None:
+        print(f"No output directory specified; using directory {output_dir}")
+
+    cfg = GlobalConfig(
+        mesh=args.mesh,
+        output_dir=output_dir,
+        lights=lights,
+        background_light=background_light,
+        camera=camera,
+        camera_poses=camera_poses,
+        use_gpu=not args.no_gpu,
+        samples=args.samples,
+        depth_pass=True,
     )
 
-    with open(args.output_path, "w") as fp:
-        np.save(fp, pointcloud)
+    print("Rendering dataset…")
+    render_dataset(cfg)
+
+    # After rendering, generate pointcloud from the rendered images
+    if not args.no_pointcloud:
+        print("Creating pointcloud...")
+        pointcloud = create_pointcloud_from_multiview(
+            multiview_rgb_path=output_dir,
+            num_points=args.points,
+            random_subsample_count=2**18,
+        )
+
+        # If specified, add plotly html visualization
+        if args.html:
+            fig = create_pointcloud_figure(pointcloud)
+            fig.write_html(output_dir / "pointcloud.html")
+
+        # Save pointcloud to a .npy file
+        if args.as_ply:
+            pc_path = output_dir / "pointcloud.ply"
+            write_ply(pc_path, pointcloud=pointcloud)
+        else:
+            pc_path = output_dir / "pointcloud.npy"
+            np.save(pc_path, pointcloud)
+
+        print(f"Pointcloud saved to {pc_path}")
+    else:
+        print("Skipping pointcloud generation as requested.")
 
 
 if __name__ == "__main__":
