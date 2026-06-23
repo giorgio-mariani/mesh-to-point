@@ -245,5 +245,5 @@ def prepare_scene(cfg: GlobalConfig) -> None:
     for light in cfg.lights:
         _create_light(light)
 
-    _set_background_color(cfg.background_color, cfg.background_strength)
+    _set_background_color(cfg.background_light.color, cfg.background_light.intensity)
     _create_camera()
