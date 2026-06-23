@@ -4,10 +4,10 @@ from pathlib import Path
 
 import bpy
 
-from mesh_to_point.render.io import write_cameras_txt, write_images_txt, write_json
+from mesh_to_point.camera import write_camera_config
+from mesh_to_point.render.config import GlobalConfig
 from mesh_to_point.render.scene import prepare_scene, update_camera
 from mesh_to_point.render.compositor import setup_compositor
-from mesh_to_point.render.config import GlobalConfig
 
 
 def _render_view(
@@ -72,9 +72,7 @@ def render_dataset(cfg: GlobalConfig) -> None:
     (out_dir / "images").mkdir()
     (out_dir / "sparse").mkdir()
 
-    write_cameras_txt(out_dir / "sparse/cameras.txt", [cfg.camera])
-    write_images_txt(out_dir / "sparse/images.txt", cfg.camera_poses)
-    write_json(out_dir / "transforms.json", cfg.camera, cfg.camera_poses)
+    write_camera_config(out_dir / "transforms.json", cfg.camera, cfg.camera_poses)
 
     # Prepare scene objects
     prepare_scene(cfg)

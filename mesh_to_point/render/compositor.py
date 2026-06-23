@@ -1,6 +1,6 @@
 import bpy
 from pathlib import Path
-from .config import GlobalConfig
+from mesh_to_point.render.config import GlobalConfig
 
 
 def add_output(

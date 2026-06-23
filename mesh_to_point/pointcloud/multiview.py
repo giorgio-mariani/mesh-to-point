@@ -2,9 +2,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import *
 import numpy as np
-import json
 
-from mesh_to_point.camera import CameraModel, CameraPose, from_json
+from mesh_to_point.camera import CameraModel, CameraPose, read_camera_config
 from mesh_to_point.pointcloud.misc import colorize_pointcloud, subsample_pointcloud
 
 
@@ -20,7 +19,7 @@ class ViewData:
 def load_multiview_images(camera_file: str | Path) -> Generator[ViewData, None, None]:
     camera_file = Path(camera_file)
 
-    camera_model, camera_poses = from_json(camera_file)
+    camera_model, camera_poses = read_camera_config(camera_file)
 
     for pose in camera_poses:
         file_prefix = camera_file.parent / f"images/{pose.image_id:04d}"
