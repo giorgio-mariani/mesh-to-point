@@ -4,6 +4,7 @@ from typing import *
 import numpy as np
 
 from mesh_to_point.camera import CameraModel, CameraPose, read_camera_config
+from mesh_to_point.io.data import load_depth_file, load_rgba_file
 from mesh_to_point.pointcloud.misc import colorize_pointcloud, subsample_pointcloud
 
 
@@ -24,7 +25,6 @@ def load_multiview_images(camera_file: str | Path) -> Generator[ViewData, None, 
     for pose in camera_poses:
         file_prefix = camera_file.parent / f"images/{pose.image_id:04d}"
         rgb_data, alpha_data = load_rgba_file(f"{file_prefix}_rgba.png")
-        # TODO: check depth file exists
         depth_data = load_depth_file(f"{file_prefix}_depth.exr")
 
         yield ViewData(
@@ -78,22 +78,6 @@ def merge_multiviews(multiview_dir: str | Path) -> Tuple[np.ndarray, np.ndarray]
     rgb_values = np.concatenate(all_rgb_values, axis=0)
 
     return coords, rgb_values
-
-
-def load_depth_file(filepath: str) -> np.ndarray:
-    import OpenEXR
-
-    (exr_part,) = OpenEXR.File(str(filepath)).parts
-    return exr_part.channels["V"].pixels.reshape(-1, 1)
-
-
-def load_rgba_file(filepath: str) -> Tuple[np.ndarray, np.ndarray]:
-    from PIL import Image
-
-    rgba = np.array(Image.open(filepath)).astype(np.float32) / 255.0
-    rgb = rgba[:, :, :3]
-    alpha = rgba[:, :, 3:4]
-    return rgb.reshape(-1, 3), alpha.reshape(-1, 1)
 
 
 def create_pointcloud_from_multiview(
