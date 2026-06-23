@@ -70,7 +70,6 @@ def render_dataset(cfg: GlobalConfig) -> None:
         out_dir.mkdir(parents=True, exist_ok=True)
 
     (out_dir / "images").mkdir()
-    (out_dir / "sparse").mkdir()
 
     write_camera_config(out_dir / "transforms.json", cfg.camera, cfg.camera_poses)
 
