@@ -1,50 +1,6 @@
 from pathlib import Path
-import tempfile
 from typing import *
 import numpy as np
-
-
-def visualize_pointcloud(pointcloud: np.ndarray):
-    import plotly.graph_objects as go
-
-    assert pointcloud.shape[-1] == 6
-    assert len(pointcloud.shape) == 2
-    xyz = pointcloud[:, :3]
-    x, y, z = xyz.T
-
-    color = [f"rgb({r},{g},{b})" for (r, g, b) in np.uint8(pointcloud[:, 3:] * 255.0)]
-
-    fig = go.Figure(
-        dict(
-            type="scatter3d",
-            mode="markers",
-            x=x,
-            y=y,
-            z=z,
-            marker=dict(size=1, color=color),
-        )
-    )
-
-    fig.update_scenes(aspectmode="data")
-    return fig
-
-
-def create_pointcloud_from_mesh(
-    mesh_path: Path,
-    num_points: int,
-    random_subsample_count: Optional[int] = None,
-    **kwargs,
-) -> np.ndarray:
-    from mesh_to_point.render.render import render_dataset
-
-    with tempfile.TemporaryDirectory() as tmpdir:
-        render_dataset(mesh_path=mesh_path, output_path=tmpdir, **kwargs)
-        pointcloud = create_pointcloud_from_multiview(
-            multiview_path=Path(tmpdir),
-            num_points=num_points,
-            random_subsample_count=random_subsample_count,
-        )
-    return pointcloud
 
 
 def create_camera_poses(
