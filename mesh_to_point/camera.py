@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 import json
+from typing import List
 import warnings
 from pathlib import Path
 from typing import *
@@ -117,7 +118,30 @@ class CameraModel:
         return origins, dirs_world
 
 
-def from_json(camera_file: str | Path) -> Tuple[CameraModel, List[CameraPose]]:
+def read_camera_config(camera_file: str | Path) -> Tuple[CameraModel, List[CameraPose]]:
+    """Read camera extrinsic and intrinsic parameters from a Nerfstudio ``transform.json`` file.
+
+    The function parses a JSON file that follows the Nerfstudio camera configuration format
+    (see :func:`write_camera_config`).  It extracts the intrinsic camera model and
+    parameters, and builds a :class:`CameraModel` instance.  For each frame in the
+    ``frames`` list it constructs a :class:`CameraPose` containing the camera‑to‑world
+    transformation matrix.
+
+    Parameters
+    ----------
+    camera_file : str | :class:`pathlib.Path`
+        Path to the JSON file containing the camera configuration.  The file is
+        expected to contain the keys ``camera_model``, ``w``, ``h``, ``fl_x``,
+        ``fl_y``, ``cx`` and ``cy`` for the intrinsic block, and a list of
+        ``frames`` where each frame contains a ``transform_matrix``.
+
+    Returns
+    -------
+    Tuple[:class:`CameraModel`, List[:class:`CameraPose`]]
+        A tuple where the first element is the intrinsic camera model and the
+        second element is a list of camera poses (one per frame).  The order of
+        the poses matches the order of the ``frames`` array in the JSON.
+    """
     camera_file = Path(camera_file)
     with open(camera_file, "r") as fp:
         camera_data = json.load(fp)
@@ -177,3 +201,63 @@ def from_json(camera_file: str | Path) -> Tuple[CameraModel, List[CameraPose]]:
 
             camera_extrinsics.append(cam_pose)
     return camera_intrinsics, camera_extrinsics
+
+
+def write_camera_config(
+    file_path: str | Path, camera: CameraModel, camera_poses: List[CameraPose]
+) -> None:
+    """Write camera parameters in the Nerfstudio ``transform.json`` format.
+
+    The output JSON follows the structure used by the Nerfstudio pipeline:
+
+    .. code-block:: json
+
+        {
+            "camera_model": "PINHOLE",
+            "w": 1920,
+            "h": 1080,
+            "fl_x": 1000.0,
+            "fl_y": 1000.0,
+            "cx": 960.0,
+            "cy": 540.0,
+            "frames": [
+                {"transform_matrix": [[...], [...], [...], [...]]},
+                ...
+            ]
+        }
+
+    Parameters
+    ----------
+    file_path:
+        Path to write the JSON file.
+    camera:
+        :class:`CameraModel` instance containing intrinsic parameters.
+    camera_poses:
+        List of :class:`CameraPose` objects providing extrinsics for each frame.
+    """
+    data: dict = {
+        "camera_model": camera.model,
+        "w": camera.width,
+        "h": camera.height,
+        "fl_x": camera.fx,
+        "fl_y": camera.fy,
+        "cx": camera.cx,
+        "cy": camera.cy,
+        "frames": [],
+    }
+
+    for pose in camera_poses:
+        # Nerfstudio expects a 4x4 camera‑to‑world matrix.
+        matrix = pose.cam_to_world.tolist()
+        data["frames"].append(
+            {
+                "file_path": f"images/{pose.camera_id:04}_rgba.png",
+                "transform_matrix": matrix,
+            }
+        )
+
+    # Write JSON with pretty formatting.
+    import json
+
+    with open(file_path, "w") as fp:
+        json.dump(data, fp, indent=4)

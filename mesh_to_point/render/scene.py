@@ -6,7 +6,9 @@ import bpy
 from mathutils import Vector
 
 from mesh_to_point.camera import CameraPose
-from mesh_to_point.render.config import Light, GlobalConfig
+from mesh_to_point.lights import Light
+
+from mesh_to_point.render.config import GlobalConfig
 
 
 class MeshFormat(Enum):
