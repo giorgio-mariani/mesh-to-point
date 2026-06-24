@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=80", "setuptools-scm[simple]>=8"]
+build-backend = "setuptools.build_meta"
+
 [project]
 dynamic = ["version"]
 name = "mesh-to-point"
@@ -33,3 +37,8 @@ mesh-to-point = "mesh_to_point.main:main"
 dev = [
     "pre-commit>=4.6.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/giorgio-mariani/mesh-to-point"
+Repository = "https://github.com/giorgio-mariani/mesh-to-point"
+Issues = "https://github.com/giorgio-mariani/mesh-to-point/issues"
