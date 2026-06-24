@@ -1,6 +1,10 @@
+[build-system]
+requires = ["setuptools>=80", "setuptools-scm[simple]>=8"]
+build-backend = "setuptools.build_meta"
+
 [project]
+dynamic = ["version"]
 name = "mesh-to-point"
-version = "0.1.0"
 description = "RGB point-cloud generation from meshes."
 readme = "README.md"
 requires-python = ">=3.13"
@@ -20,14 +24,21 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pre-commit",
-    "black",
     "pytest",
 ]
 
 [tool.setuptools]
 packages = ["mesh_to_point"]
 
+[project.scripts]
+mesh-to-point = "mesh_to_point.main:main"
+
 [dependency-groups]
 dev = [
     "pre-commit>=4.6.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/giorgio-mariani/mesh-to-point"
+Repository = "https://github.com/giorgio-mariani/mesh-to-point"
+Issues = "https://github.com/giorgio-mariani/mesh-to-point/issues"
