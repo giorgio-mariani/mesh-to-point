@@ -1,0 +1,13 @@
+{
+    "environment_color": [1,1,1,1],
+    "environment_intensity": 0.5,
+    "lights":[
+        {
+            "origin": [0,0,2],
+            "color": [1,1,1],
+            "intensity": 10,
+            "use_shadows": true
+        }
+
+    ]
+}
