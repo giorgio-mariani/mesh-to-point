@@ -58,6 +58,40 @@ class CameraModel:
     cx: float
     cy: float
 
+    def validate(self):
+        """Validate the camera model and parameters.
+
+        Raises
+        ------
+        ValueError
+            If the camera model is not supported or if any of the intrinsic parameters are invalid.
+        """
+
+        if self.model not in SUPPORTED_CAMERA_MODELS:
+            raise ValueError(
+                f"Unsupported camera model '{self.model}'. Supported models are: "
+                f"{', '.join(sorted(SUPPORTED_CAMERA_MODELS))}."
+            )
+
+        if self.width <= 0 or self.height <= 0:
+            raise ValueError("Image width and height must be positive integers.")
+
+        if self.fx <= 0 or self.fy <= 0:
+            raise ValueError("Focal lengths fx and fy must be positive.")
+
+        if not np.isclose(self.cx, self.width / 2):
+            raise ValueError(
+                f"Principal point cx={self.cx} is not at the image center (width/2={self.width / 2})."
+            )
+
+        if not np.isclose(self.cy, self.height / 2):
+            raise ValueError(
+                f"Principal point cy={self.cy} is not at the image center (height/2={self.height / 2})."
+            )
+
+        if not np.isclose(self.fx, self.fy):
+            raise ValueError(f"focal lengths fx and fy must be equal.")
+
     @property
     def K(self) -> np.ndarray:
         """3x3 intrinsic calibration matrix."""
@@ -147,19 +181,10 @@ def read_camera_config(camera_file: str | Path) -> Tuple[CameraModel, List[Camer
         camera_data = json.load(fp)
         camera_id = 0
 
-        # Validate camera model type – only a few are supported by this code.
-        cam_model = camera_data["camera_model"]
-        if cam_model not in SUPPORTED_CAMERA_MODELS:
-            raise ValueError(
-                f"Unsupported camera model '{cam_model}'. Supported models are: "
-                f"{', '.join(sorted(SUPPORTED_CAMERA_MODELS))}."
-            )
-
         _INTRINSIC_KEYS = {"camera_model", "w", "h", "fl_x", "fl_y", "cx", "cy"}
-
         camera_intrinsics = CameraModel(
             camera_id=camera_id,
-            model=cam_model,
+            model=camera_data["camera_model"],
             width=camera_data["w"],
             height=camera_data["h"],
             fx=camera_data["fl_x"],
@@ -167,6 +192,9 @@ def read_camera_config(camera_file: str | Path) -> Tuple[CameraModel, List[Camer
             cx=camera_data["cx"],
             cy=camera_data["cy"],
         )
+
+        # Validate camera model type – only a few are supported by this code.
+        camera_intrinsics.validate()
 
         camera_extrinsics = []
         # Keys that belong to the intrinsic block – if any of these appear in a frame, we warn.

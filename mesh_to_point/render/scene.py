@@ -5,7 +5,7 @@ from typing import *
 import bpy
 from mathutils import Vector
 
-from mesh_to_point.camera import CameraPose
+from mesh_to_point.camera import CameraPose, CameraModel
 from mesh_to_point.lights import Light
 
 from mesh_to_point.render.config import GlobalConfig
@@ -86,12 +86,17 @@ def _normalize_scene():
     bpy.ops.object.select_all(action="DESELECT")
 
 
-def _create_camera():
+def _create_camera(camera_intrinsics: CameraModel):
     # https://b3d.interplanety.org/en/how-to-create-camera-through-the-blender-python-api/
     camera_data = bpy.data.cameras.new(name="Camera")
     camera_object = bpy.data.objects.new("Camera", camera_data)
     bpy.context.scene.collection.objects.link(camera_object)
     bpy.context.scene.camera = camera_object
+
+    camera_object.data.sensor_fit = "HORIZONTAL"
+    camera_object.data.angle = 2 * math.atan(
+        camera_intrinsics.width / 2 / camera_intrinsics.fy
+    )
     return camera_object
 
 
@@ -202,10 +207,6 @@ def update_camera(camera_obj, camera_pose: CameraPose) -> None:
     R = camera_pose.R
     x, y, z = R.T
 
-    # TODO: setup the commented stuff
-    # cam_obj.data.sensor_fit = "HORIZONTAL"
-    # cam_obj.data.angle = camera_pose.fov
-    # cam_obj.location[:] = camera_pose.origin
     camera_obj.matrix_world.col[0][:3] = x
     camera_obj.matrix_world.col[1][:3] = y
     camera_obj.matrix_world.col[2][:3] = z
@@ -248,4 +249,4 @@ def prepare_scene(cfg: GlobalConfig) -> None:
         _create_light(light)
 
     _set_background_color(cfg.background_light.color, cfg.background_light.intensity)
-    _create_camera()
+    _create_camera(cfg.camera)
