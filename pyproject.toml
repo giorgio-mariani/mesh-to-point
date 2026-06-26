@@ -25,6 +25,8 @@ dependencies = [
 dev = [
     "pre-commit",
     "pytest",
+    "coverage",
+    "pytest-cov",
 ]
 
 [tool.setuptools]
