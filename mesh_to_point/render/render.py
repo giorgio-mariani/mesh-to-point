@@ -84,13 +84,21 @@ def render_dataset(cfg: GlobalConfig) -> None:
 
         scene.view_layers["ViewLayer"].use_pass_z = True
         scene.render.engine = "CYCLES"
-        scene.use_nodes = True
         scene.cycles.samples = cfg.samples
         scene.render.film_transparent = True
         scene.render.image_settings.file_format = "PNG"
         scene.render.filepath = str(render_dir / "rgba.png")
 
         if cfg.use_gpu:
+
+            # get_devices() to let Blender detects GPU device
+            bpy.context.preferences.addons["cycles"].preferences.get_devices()
+            bpy.context.preferences.addons["cycles"].preferences.compute_device_type = (
+                "OPTIX"
+            )
+            for d in bpy.context.preferences.addons["cycles"].preferences.devices:
+                d["use"] = True
+
             bpy.context.scene.cycles.device = "GPU"
             bpy.context.scene.cycles.use_denoising = True
 
