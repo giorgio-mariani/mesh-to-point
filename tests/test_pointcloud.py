@@ -2,7 +2,6 @@ import pytest
 import numpy as np
 from mesh_to_point.pointcloud.misc import (
     subsample_pointcloud,
-    colorize_pointcloud,
     farthest_point_sample,
 )
 
