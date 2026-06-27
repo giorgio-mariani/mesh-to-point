@@ -1,5 +1,6 @@
 import argparse
 from pathlib import Path
+import sys
 import numpy as np
 
 from mesh_to_point.camera import read_camera_config
@@ -14,18 +15,6 @@ ASSETS_DIR = Path(__file__).parent.parent / "assets"
 
 
 def _parse_args() -> argparse.Namespace:
-    """Parse command-line arguments for the CLI.
-
-    The CLI accepts the following options:
-    - ``--mesh``: Path to the mesh file to render.
-    - ``--camera-config``: Path to a camera configuration JSON (e.g. ``transforms.json``).
-    - ``--lights-config``: Path to a lights configuration JSON.
-    - ``--output-dir``: Base directory where rendered images and pointcloud will be stored.
-    - ``--points``: Number of points to keep in the final pointcloud.
-    - ``--subsample``: Random subsample count used during pointcloud construction.
-    - ``--samples``: Number of samples for Blender Cycles rendering.
-    - ``--no-gpu``: Disable GPU rendering.
-    """
     parser = argparse.ArgumentParser(
         description="Render a mesh and generate a pointcloud."
     )
@@ -89,16 +78,41 @@ def _parse_args() -> argparse.Namespace:
 def main() -> None:
     args = _parse_args()
 
-    # Load camera and lights configuration
-    camera, camera_poses = read_camera_config(args.cameras)
-    background_light, lights = read_light_config(args.lights)
-
-    # Build global configuration for rendering
-    # Resolve output directory, creating a temporary one if not provided
     output_dir = args.output_dir or Path("output")
     if args.output_dir is None:
         print(f"No output directory specified; using directory {output_dir}")
 
+    if output_dir.exists():
+        print(f"Error: Output directory '{output_dir}' already exist.")
+        sys.exit(1)
+
+    # Validate that required input files exist before proceeding
+    if not args.mesh.exists():
+        print(f"Error: Mesh file '{args.mesh}' does not exist.")
+        sys.exit(1)
+
+    if not args.cameras.exists():
+        print(f"Error: Camera configuration file '{args.cameras}' does not exist.")
+        sys.exit(1)
+
+    if not args.lights.exists():
+        print(f"Error: Lights configuration file '{args.lights}' does not exist.")
+        sys.exit(1)
+
+    # Load camera and lights configuration
+    try:
+        camera, camera_poses = read_camera_config(args.cameras)
+    except Exception as e:
+        print(f"Error: There was an error during the camera configuration loading: {e}")
+        sys.exit(1)
+
+    try:
+        background_light, lights = read_light_config(args.lights)
+    except Exception as e:
+        print(f"Error: There was an error during the lights configuration loading: {e}")
+        sys.exit(1)
+
+    # Build global configuration for rendering
     cfg = GlobalConfig(
         mesh=args.mesh,
         output_dir=output_dir,
