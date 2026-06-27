@@ -1,12 +1,24 @@
 # Mesh‑to‑Point
+![PyPI version](https://img.shields.io/pypi/v/mesh-to-point?style=flat-square)
 
 ## Overview
 `mesh-to-point` is a lightweight Python library that converts 3D meshes into dense RGB point clouds.
 
 It is built on top of **NumPy**, and **scikit‑learn** for data handling, and uses **Blender** (via the `bpy` API) for rendering synthetic views.
 
-The project ships a small command‑line interface that can render a mesh from multiple camera viewpoints and generate a point cloud from the rendered RGB-D images.
 
+> **Why use it?**
+> * Easy installation using the headless Blender `bpy` library.
+> * Simple CLI for quick experiments.
+> * Clean Python API for integration into pipelines.
+
+### Features
+
+* Render a mesh from arbitrary camera poses.
+* Generate depth maps and RGB images.
+* Build a dense RGB point cloud from multiple views.
+* Export point clouds as NumPy arrays, PLY files, or interactive Plotly HTML.
+* Customizable lighting and camera configurations via JSON.
 
 ## Installation
 The package is published on PyPI and can be installed with `pip`:
@@ -17,12 +29,19 @@ pip install mesh-to-point
 
 Note that this will also install a headless version of blender 5.0 to be used for rendering.
 
-**Development install.** If you want to contribute or run the test suite, install the optional development dependencies:
+**Development install.** The repository is set up to use **uv** for dependency and environment management. If you plan to contribute or run the test suite, follow these steps:
 
-```bash
-pip install .[dev]
-pre-commit install
-```
+1. **Clone the repository**
+    ```bash
+    git clone https://github.com/giorgio-mariani/mesh-to-point.git
+    cd mesh-to-point
+    ```
+2. **Create a virtual environment and install dev dependencies**
+    ```bash
+    uv sync --extra dev
+    pre-commit install
+    ```
+    These commands set up a clean environment with all the tools needed for development and testing.
 
 ## Quick start
 ### Command Line Interface
@@ -44,7 +63,8 @@ The command will:
 * Write the point cloud as a NumPy ``.npy`` array or (optionally) as a text ``.ply`` file.
 * Optionally generate an interactive Plotly HTML visualization of the point cloud.
 
-**Output directory.** The output directory contains the rendered images, camera transforms, point cloud data, and an optional HTML visualization. Images are stored under ``<output_dir>/images`` as ``<index>_rgb.png`` and ``<index>_depth.exr``. Extrinsic and intrinsic camera parameters are saved in ``transforms.json``. The point cloud is written as ``pointcloud.npy`` (or ``pointcloud.ply`` if ``--as-ply`` is used). If ``--html`` is enabled, an interactive Plotly visualization is generated as ``pointcloud.html``.
+#### Output directory
+The output directory contains the rendered images, camera transforms, point cloud data, and an optional HTML visualization. Images are stored under ``<output_dir>/images`` as ``<index>_rgb.png`` and ``<index>_depth.exr``. Extrinsic and intrinsic camera parameters are saved in ``transforms.json``. The point cloud is written as ``pointcloud.npy`` (or ``pointcloud.ply`` if ``--as-ply`` is used). If ``--html`` is enabled, an interactive Plotly visualization is generated as ``pointcloud.html``.
 
 Overview of output directory structure:
 
@@ -61,7 +81,23 @@ Overview of output directory structure:
 |- pointcloud.html  # Point cloud visualization script (only if --html is used)
 ```
 
-**Configuration files.** Lighting and camera information are provided to the CLI through JSON files; These describe the extrinsic camera poses and the intrinsic camera parameters, together with the amount of point lights in the scene and the background light color and intensity. If these are not provided, `mesh-to-point` will default to [[assets/cameras.json]] and [[assets/lights.json]] for cameras and lights respectively.
+#### Available input formats
+`mesh-to-point` accepts a variety of common 3D mesh file formats. The format is detected automatically from the file extension.
+
+| Extension | Importer used | Notes |
+|-----------|---------------|-------|
+| `.gltf`   | `bpy.ops.import_scene.gltf` | Standard GLTF 2.0, supports embedded textures.
+| `.glb`    | `bpy.ops.import_scene.gltf` | Binary GLTF, same importer as `.gltf`.
+| `.obj`    | `bpy.ops.import_scene.obj` | Wavefront OBJ
+| `.fbx`    | `bpy.ops.import_scene.fbx` | Autodesk FBX
+| `.ply`    | `bpy.ops.import_mesh.ply` | Stanford PLY, supports ASCII/Binary.
+| `.stl`    | `bpy.ops.import_mesh.stl` | STL, supports ASCII/Binary.
+
+All imports are performed by Blender’s built‑in import operators. `mesh-to-point` does not attempt any format conversion; the mesh is loaded directly into the Blender scene and then normalised to fit within a unit cube centred at the origin.
+
+
+#### Configuration files
+Lighting and camera information are provided to the CLI through JSON files; These describe the extrinsic camera poses and the intrinsic camera parameters, together with the amount of point lights in the scene and the background light color and intensity. If these are not provided, `mesh-to-point` will default to [[assets/cameras.json]] and [[assets/lights.json]] for cameras and lights respectively.
 - *Camera configuration.* The file should follow the format used by the `mesh_to_point.read_camera_config` helper. It contains intrinsic parameters (focal length, principal point, image size) and a list of extrinsic pose matrices.
 - *Lights configuration.* It specifies an optional environment color and intensity, together with a list of point lights. Each light has an origin, color, intensity, and a flag for shadows.  The file is parsed by `mesh_to_point.read_light_config`, take a look at the function docstring for a more in-depth description.
 
@@ -113,62 +149,58 @@ lights.json
 
 Examples for both configuration file types can found in the `./assets` directory.
 
-### API reference
-The library exposes a small set of public functions that can be used programmatically:
+---
 
-* ``mesh_to_point.render_dataset`` – Render a dataset of RGB-D images from a mesh.
-* ``mesh_to_point.create_pointcloud_from_multiview`` – Build a point cloud from a directory of rendered RGB-D images.
-* ``mesh_to_point.create_pointcloud_figure`` – Create a Plotly figure for visualising a point cloud.
+## Python API
 
-#### Examples
-If necessary, it is possible to directly invoke the python rendering function instead of using the [command-line interface](#command-line-interface). For example, by calling the `render_dataset` function directly:
+The library exposes three main functions:
+
+| Function | Purpose |
+|----------|---------|
+| `render_dataset` | Render RGB‑D images from a mesh. |
+| `create_pointcloud_from_multiview` | Build a point cloud from a directory of rendered images. |
+| `create_pointcloud_figure` | Create a Plotly figure for visualising a point cloud. |
+
+### Example workflow
+
 ```python
-from mesh_to_point import render_dataset, GlobalConfig, read_camera_config, read_light_config
+from mesh_to_point import (
+        GlobalConfig,
+        read_camera_config,
+        read_light_config,
+        render_dataset,
+        create_pointcloud_from_multiview,
+        create_pointcloud_figure,
+)
 
-# Load camera and lights configuration
-camera, camera_poses = read_camera_config("path-to-camera-cfg")
-background_light, lights = read_light_config("path-to-light-cfg")
+# Load configuration
+camera, camera_poses = read_camera_config("assets/cameras.json")
+env_light, lights = read_light_config("assets/lights.json")
 
-# Setup rendering config
+# Rendering configuration
 cfg = GlobalConfig(
-    mesh="path-to-mesh",
-    output_dir="output",
-    lights=lights,
-    background_light=background_light,
-    camera=camera,
-    camera_poses=camera_poses,
-    use_gpu=True,
-    samples=16,
-    depth_pass=True,
+        mesh="assets/suzanne.glb",
+        output_dir="output",
+        lights=lights,
+        background_light=env_light,
+        camera=camera,
+        camera_poses=camera_poses,
+        samples=16,
 )
 
-# Render views
+# Render the dataset
 render_dataset(cfg)
-```
-Once the multiple views have been rendered, it is possible to construct a point cloud from them by
-using the `create_pointcloud_from_multiview` utility:
-```python
-from mesh_to_point import create_pointcloud_from_multiview
 
-# Path to the folder that contains the rendered images.
-# The folder must follow the CLI output layout:
-#        <output_dir>/images/<idx>_rgb.png
-#        <output_dir>/images/<idx>_depth.exr
-render_dir = "output"
-pointcloud = create_pointcloud_from_multiview(
-    render_dir, num_points=8192,
-)
+# Build the point cloud
+pc = create_pointcloud_from_multiview("output", num_points=8192)
+print("Point cloud shape:", pc.shape)  # (8192, 6)
 
-print(f"Point cloud shape: {pointcloud.shape}")   # (8192, 6)
+# Visualise with Plotly
+fig = create_pointcloud_figure(pc)
+fig.write_html("pointcloud.html")
+```
 
-```
-Finally, it is also possible to produce an HTML/javascript file to visualize the point cloud on a browser of your choice.
-```python
-from mesh_to_point import create_pointcloud_figure
-# Visualise the point cloud with Plotly.
-fig = create_pointcloud_figure(pointcloud)
-fig.write_html("pointcloud.html")   # open in a browser to visualize the point cloud
-```
+---
 
 ## License
 MIT – see the [LICENSE](LICENSE) file.
