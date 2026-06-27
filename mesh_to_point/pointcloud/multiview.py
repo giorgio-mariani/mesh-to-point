@@ -5,7 +5,7 @@ import numpy as np
 
 from mesh_to_point.camera import CameraModel, CameraPose, read_camera_config
 from mesh_to_point.io.data import load_depth_file, load_rgba_file
-from mesh_to_point.pointcloud.misc import colorize_pointcloud, subsample_pointcloud
+from mesh_to_point.pointcloud.misc import transfer_colors, subsample_pointcloud
 
 
 @dataclass
@@ -101,7 +101,7 @@ def create_pointcloud_from_multiview(
         random_subsample_count=random_subsample_count,
     )
 
-    point_rgb_f = colorize_pointcloud(
+    point_rgb_f = transfer_colors(
         point_coords_f, np.concat([point_coords_1, point_rgb], axis=-1)
     )
     return np.concat([point_coords_f, point_rgb_f], axis=-1)

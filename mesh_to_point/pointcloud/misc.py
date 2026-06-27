@@ -5,8 +5,37 @@ import numpy as np
 
 
 def get_nearest_neightbor(
-    neighbors: np.ndarray, points, batch_size: int = 512
+    neighbors: np.ndarray, points: np.ndarray, batch_size: int = 512
 ) -> np.ndarray:
+    """Return the index of the nearest neighbor for each query point.
+
+    Parameters
+    ----------
+    neighbors : np.ndarray
+        Array of shape ``(N, D)`` containing the candidate points that
+        will be searched for. ``D`` is the dimensionality of the
+        space (typically 3 for 3D coordinates).
+    points : np.ndarray
+        Array of shape ``(M, D)`` containing the query points for
+        which the nearest neighbor in ``neighbors`` should be found.
+    batch_size : int, optional
+        Number of query points processed in a single batch.  The
+        implementation splits the queries into batches to keep the
+        memory footprint low for very large point clouds.
+
+    Returns
+    -------
+    np.ndarray
+        Integer array of shape ``(M,)`` where each element is the
+        index of the closest point in ``neighbors`` to the
+        corresponding query point.
+
+    Notes
+    -----
+      If two or more neighbors are at the same distance, the
+      first one encountered (i.e., the one with the smallest index)
+      is returned.
+    """
     num_points, _ = points.shape
     num_batches = num_points // batch_size + (num_points % batch_size != 0)
     nearest_neighbour = np.zeros([num_points], dtype=np.int32)
@@ -26,10 +55,43 @@ def get_nearest_neightbor(
 def subsample_pointcloud(
     point_coords: np.ndarray,
     num_points: int,
-    point_rgb: Optional[np.ndarray] = None,
-    random_subsample_count: Optional[int] = None,
-) -> np.ndarray:
+    point_rgb: np.ndarray | None = None,
+    random_subsample_count: int | None = None,
+) -> Tuple[np.ndarray, np.ndarray]:
+    """Subsample a point cloud to a target number of points using farthest-point sampling.
 
+    The function applies farthest-point sampling (FPS) to select a representative
+    subset of points that are well-distributed across the point cloud. An optional
+    random downsampling step can be applied first to reduce the search space for
+    very large inputs.
+
+    Parameters
+    ----------
+    point_coords : np.ndarray
+        Array of shape ``(N, D)`` containing the point coordinates, where
+        ``N`` is the number of points and ``D`` is the dimensionality.
+    num_points : int
+        Target number of points to subsample to.
+    point_rgb : np.ndarray, optional
+        Array of shape ``(N, D)`` containing per-point RGB color values.
+        If ``None``, colors default to ones.
+    random_subsample_count : int, optional
+        If provided, first randomly downsample the point cloud to this
+        many points before applying farthest-point sampling. This speeds
+        up FPS on very large point clouds at the cost of representativeness.
+
+    Returns
+    -------
+    tuple[np.ndarray, np.ndarray]
+        A tuple of ``(subsampled_coords, subsampled_rgb)`` arrays, each
+        of shape ``(num_points, D)``.
+
+    Notes
+    -----
+    Farthest-point sampling greedily selects points that are maximally
+    distant from already-selected points, producing a uniform spatial
+    coverage of the point cloud.
+    """
     if point_rgb is None:
         point_rgb = np.ones_like(point_coords)
 
@@ -57,10 +119,33 @@ def subsample_pointcloud(
     return fps_coords, fps_rgb
 
 
-def colorize_pointcloud(
+def transfer_colors(
     point_coords: np.ndarray,
     point_coords_rgb: np.ndarray,
-):
+) -> np.ndarray:
+    """Transfer RGB colors from a colored point cloud to an uncolored one.
+
+    For each point in ``point_coords``, the function finds the nearest
+    neighbor in ``point_coords_rgb`` and transfers its color.  If multiple
+    colored points map to the same target point, their colors are averaged.
+    Points with no direct mapping receive the mean color of their 6
+    nearest colored neighbors as a fallback.
+
+    Parameters
+    ----------
+    point_coords : np.ndarray
+        Array of shape ``(N, D)`` containing the target point coordinates
+        that need to be colored.
+    point_coords_rgb : np.ndarray
+        Array of shape ``(M, D + 3)`` containing source point coordinates
+        followed by their RGB color values (the last 3 columns).
+
+    Returns
+    -------
+    np.ndarray
+        Array of shape ``(N, 3)`` containing the mean RGB color for each
+        point in ``point_coords``.
+    """
     num_points, _ = point_coords.shape
     num_points_rgb, _ = point_coords_rgb.shape
     from sklearn.neighbors import NearestNeighbors
@@ -94,18 +179,43 @@ def colorize_pointcloud(
 def farthest_point_sample(
     pointcloud: np.ndarray,
     num_points: int,
-    init_idx: Optional[int] = None,
+    init_idx: int | None = None,
 ) -> np.ndarray:
-    """
-    Sample a subset of the point cloud that is evenly distributed in space.
+    """Select a subset of points that are evenly spread in space.
 
-    First, a random point is selected. Then each successive point is chosen
-    such that it is furthest from the currently selected points.
+    The algorithm is a classic *farthest-point sampling* (FPS).  It
+    starts from an arbitrary point (random if ``init_idx`` is ``None``)
+    and repeatedly adds the point that is farthest from the set of
+    already selected points.  The result is a set of ``num_points``
+    indices that tend to cover the whole point cloud.
 
-    The time complexity of this operation is O(NM), where N is the original
-    number of points and M is the reduced number. Therefore, performance
-    can be improved by randomly subsampling points with random_sample()
-    before running farthest_point_sample().
+    Parameters
+    ----------
+    pointcloud : np.ndarray
+            Array of shape ``(N, D)`` where ``N`` is the number of
+            points and ``D`` is the dimensionality (usually 3 for 3D
+            coordinates).  Only the first three columns are used for the
+            distance calculation.
+    num_points : int
+            Desired number of points to sample.  If ``num_points`` is
+            larger than ``N`` the function will simply return the
+            original indices.
+    init_idx : int | None, optional
+            Index of the point to start from.  If ``None`` a random
+            point is chosen.
+
+    Returns
+    -------
+    np.ndarray
+            Integer array of shape ``(num_points,)`` containing the
+            indices of the selected points.
+
+    Notes
+    -----
+    * The algorithm runs in `O(NM)` time where ``N`` is the
+        number of input points and ``M`` is ``num_points``.
+    * For very large point clouds it is advised to first reduce the
+        dataset with a random subsample before calling FPS.
     """
 
     def compute_dists(idx: int) -> np.ndarray:

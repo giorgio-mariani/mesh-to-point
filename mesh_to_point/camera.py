@@ -25,7 +25,7 @@ class CameraPose:
 
     @property
     def cam_to_world(self) -> np.ndarray:
-        """4x4 world-to-camera matrix."""
+        """4x4 camera-to-world matrix."""
         T = np.eye(4)
         T[:3, :3] = self.R
         T[:3, 3] = self.t
@@ -33,7 +33,7 @@ class CameraPose:
 
     @property
     def world_to_cam(self) -> np.ndarray:
-        """4x4 camera-to-world matrix (common convention for NeRF, etc.)."""
+        """4x4 world-to-camera matrix."""
         T = np.eye(4)
         R_c2w = self.R.T
         t_c2w = -R_c2w @ self.t
@@ -44,7 +44,7 @@ class CameraPose:
     @property
     def camera_center(self) -> np.ndarray:
         """Camera position in world coordinates."""
-        return -self.R.T @ self.t
+        return self.t
 
 
 @dataclass
