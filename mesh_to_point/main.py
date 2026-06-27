@@ -9,7 +9,7 @@ from mesh_to_point.lights import read_light_config
 from mesh_to_point.pointcloud.misc import create_pointcloud_figure
 from mesh_to_point.render.render import render_dataset
 from mesh_to_point.pointcloud.multiview import create_pointcloud_from_multiview
-from mesh_to_point.render.config import GlobalConfig
+from mesh_to_point.render.config import DeviceType, GlobalConfig
 
 ASSETS_DIR = Path(__file__).parent.parent / "assets"
 
@@ -53,9 +53,11 @@ def _parse_args() -> argparse.Namespace:
         help="Number of samples for Blender Cycles rendering.",
     )
     parser.add_argument(
-        "--no-gpu",
-        action="store_true",
-        help="Disable GPU rendering (use CPU instead).",
+        "--device-type",
+        type=DeviceType,
+        default=DeviceType.CPU,
+        choices=[c.name for c in DeviceType],
+        help=f"GPU rendering device type. Defaults to CPU usage.",
     )
     parser.add_argument(
         "--no-pointcloud",
@@ -80,7 +82,7 @@ def main() -> None:
 
     output_dir = args.output_dir or Path("output")
     if args.output_dir is None:
-        print(f"No output directory specified; using directory {output_dir}")
+        print(f"Warning: No output directory specified; using directory {output_dir}")
 
     if output_dir.exists():
         print(f"Error: Output directory '{output_dir}' already exist.")
@@ -120,7 +122,7 @@ def main() -> None:
         background_light=background_light,
         camera=camera,
         camera_poses=camera_poses,
-        use_gpu=not args.no_gpu,
+        device_type=args.device_type,
         samples=args.samples,
         depth_pass=True,
     )

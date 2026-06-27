@@ -5,7 +5,7 @@ from pathlib import Path
 import bpy
 
 from mesh_to_point.camera import write_camera_config
-from mesh_to_point.render.config import GlobalConfig
+from mesh_to_point.render.config import DeviceType, GlobalConfig
 from mesh_to_point.render.scene import prepare_scene, update_camera
 from mesh_to_point.render.compositor import setup_compositor
 
@@ -89,14 +89,14 @@ def render_dataset(cfg: GlobalConfig) -> None:
         scene.render.image_settings.file_format = "PNG"
         scene.render.filepath = str(render_dir / "rgba.png")
 
-        if cfg.use_gpu:
+        if cfg.device_type != DeviceType.CPU:
 
             # get_devices() to let Blender detects GPU device
-            bpy.context.preferences.addons["cycles"].preferences.get_devices()
-            bpy.context.preferences.addons["cycles"].preferences.compute_device_type = (
-                "OPTIX"
-            )
-            for d in bpy.context.preferences.addons["cycles"].preferences.devices:
+            cycle_preferences = bpy.context.preferences.addons["cycles"].preferences
+
+            cycle_preferences.get_devices()
+            cycle_preferences.compute_device_type = cfg.device_type
+            for d in cycle_preferences.devices:
                 d["use"] = True
 
             bpy.context.scene.cycles.device = "GPU"
