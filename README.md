@@ -110,7 +110,7 @@ Below are two minimal examples; one for a camera configuration file and another 
 *Minimal cameras config file:*
 ```json
 {
-    "camera_model": "PINHOLE",  # Only PINHOLE or SIMPLE_PINHOLE are supported
+    "camera_model": "PINHOLE",  // Only PINHOLE or SIMPLE_PINHOLE are supported
     "fl_x": 1422.22,
     "fl_y": 1422.22,
     "cx": 512,
@@ -119,7 +119,7 @@ Below are two minimal examples; one for a camera configuration file and another 
     "w": 1024,
     "frames": [
         {
-            "transform_matrix": [  # Camera-to-world transformation matrix
+            "transform_matrix": [  // Camera-to-world transformation matrix
                 [1, 0, 0, 0],
                 [0, 1, 0, 0],
                 [0, 0, 1, 0],
@@ -132,22 +132,21 @@ Below are two minimal examples; one for a camera configuration file and another 
 
 *Minimal lights config file:*
 ```json
-lights.json
 {
-    "environment_color": [1, 1, 1, 1],  # RGB-Alpha
-    "environment_intensity": 0.5,       # Between  [0.0, 1.0]
+    "environment_color": [1, 1, 1, 1],  // RGB-Alpha
+    "environment_intensity": 0.5,       // Between  [0.0, 1.0]
     "lights": [
         {
             "origin": [0, 0, 2],
             "color": [1, 1, 1],
-            "intensity": 10,            # Between [0.0, +inf)
+            "intensity": 10,            // Between [0.0, +inf)
             "use_shadows": true
         }
     ]
 }
 ```
 
-Examples for both configuration file types can found in the `./assets` directory.
+Examples for both configuration file types can be found in the `./assets` directory.
 
 ---
 
